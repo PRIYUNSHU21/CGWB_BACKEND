@@ -16,7 +16,7 @@ def fetch_groundwater_data(state: str, district: str, agency: str, start_date: s
         "size": size
     }
     try:
-        response = requests.post(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         status_code = data.get("statusCode")
@@ -41,7 +41,7 @@ def fetch_rainfall_data(state: str, district: str, agency: str, start_date: str,
         "size": size
     }
     try:
-        response = requests.post(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         status_code = data.get("statusCode")
