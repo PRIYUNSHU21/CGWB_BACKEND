@@ -26,7 +26,7 @@ def fetch_groundwater_data(state: str, district: str, agency: str, start_date: s
     for _, row in paginated.iterrows():
         data.append({
             "dataTime": row.get('data_time', ''),
-            "dataValue": row.get('data_value', 0),
+            "dataValue": None if pd.isna(row.get('data_value')) else row.get('data_value', 0),
             "unit": row.get('unit', 'm'),
             "stationCode": "N/A",
             "stationName": "N/A",
@@ -35,7 +35,7 @@ def fetch_groundwater_data(state: str, district: str, agency: str, start_date: s
             "agencyName": row.get('agency', agency),
             "state": row.get('state', state),
             "district": row.get('district', district),
-            "wellDepth": row.get('well_depth', None)
+            "wellDepth": None if pd.isna(row.get('well_depth')) else row.get('well_depth', None)
         })
     
     return {
@@ -68,7 +68,7 @@ def fetch_rainfall_data(state: str, district: str, agency: str, start_date: str,
     for _, row in paginated.iterrows():
         data.append({
             "dataTime": row.get('data_time', ''),
-            "dataValue": row.get('data_value', 0),
+            "dataValue": None if pd.isna(row.get('data_value')) else row.get('data_value', 0),
             "unit": row.get('unit', 'mm'),
             "stationCode": "N/A",
             "stationName": "N/A",

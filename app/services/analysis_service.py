@@ -156,10 +156,11 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
     analyzed_data = check_critical_levels(gw_data)
     for item in analyzed_data:
         item["regeneration_status"] = compare_to_regeneration(recharge, item.get('dataValue', 0), state, district, agency, current_date)
+    depletion = calculate_depletion_rate(state, district, agency, current_date, period_months)
     return {
         "groundwater_data": analyzed_data,
-        "recharge_rate": recharge,
-        "depletion_rate": calculate_depletion_rate(state, district, agency, current_date, period_months),
+        "recharge_rate": recharge if not np.isnan(recharge) else 0.0,
+        "depletion_rate": depletion if not np.isnan(depletion) else 0.0,
         "unit": "m/year"
     }
 
