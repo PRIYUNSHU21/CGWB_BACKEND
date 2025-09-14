@@ -3,9 +3,9 @@ from app.routers import groundwater, rainfall, analysis
 
 app = FastAPI(title="Groundwater Resource Evaluation API", version="1.0.0")
 
-app.include_router(groundwater.router, prefix="/api/v1", tags=["Groundwater"])
-app.include_router(rainfall.router, prefix="/api/v1", tags=["Rainfall"])
-app.include_router(analysis.router, prefix="/api/v1", tags=["Analysis"])
+app.include_router(groundwater, prefix="/api/v1", tags=["Groundwater"])
+app.include_router(rainfall, prefix="/api/v1", tags=["Rainfall"])
+app.include_router(analysis, prefix="/api/v1", tags=["Analysis"])
 
 @app.get("/")
 async def root():
