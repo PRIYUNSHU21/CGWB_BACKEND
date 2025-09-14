@@ -58,8 +58,8 @@ def calculate_depletion_rate(state: str, district: str, agency: str, current_dat
     if not current_list or not past_list:
         return 0.0
     
-    current_level = current_list[0].get('water_level', 0)
-    past_level = past_list[0].get('water_level', 0)
+    current_level = current_list[0].get('dataValue', 0)
+    past_level = past_list[0].get('dataValue', 0)
     time_years = period_months / 12
     depletion = (past_level - current_level) / time_years if time_years > 0 else 0
     return max(depletion, 0)
@@ -70,7 +70,7 @@ def check_critical_levels(groundwater_data: Dict[str, Any]) -> List[Dict[str, An
         data_list = []
     results = []
     for item in data_list:
-        level = item.get('water_level', float('inf'))
+        level = item.get('dataValue', float('inf'))
         if level <= CRITICAL_THRESHOLD:
             status = "Critical"
         elif level <= LOW_THRESHOLD:
@@ -97,7 +97,7 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
     recharge = calculate_recharge_rate(state, district, agency, start_date, end_date)
     analyzed_data = check_critical_levels(gw_data)
     for item in analyzed_data:
-        item["regeneration_status"] = compare_to_regeneration(recharge, item["water_level"], state, district, agency, current_date)
+        item["regeneration_status"] = compare_to_regeneration(recharge, item.get('dataValue', 0), state, district, agency, current_date)
     return {
         "groundwater_data": analyzed_data,
         "recharge_rate": recharge,
@@ -120,7 +120,7 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
         if not isinstance(data_list, list):
             data_list = []
         if data_list:
-            level = data_list[0].get('water_level', 0)
+            level = data_list[0].get('dataValue', 0)
             dates.append((current - start_date).days)  # Days since start
             levels.append(level)
         current += timedelta(days=30)  # Monthly

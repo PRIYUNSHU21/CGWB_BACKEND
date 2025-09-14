@@ -1,7 +1,7 @@
 import requests
 
 # Base URL for the deployed API
-BASE_URL = "https://cgwb-backend.onrender.com"
+BASE_URL = "https://cgwbbackend-production.up.railway.app"
 
 def test_root():
     """Test the root endpoint."""
@@ -18,7 +18,8 @@ def test_groundwater():
         "district": "Baleshwar",
         "agency": "CGWB",
         "start_date": "2023-11-01",
-        "end_date": "2024-10-31"
+        "end_date": "2024-10-31",
+        "size": 2
     }
     response = requests.get(f"{BASE_URL}/api/v1/groundwater", params=params)
     print("Groundwater Endpoint:")
@@ -38,7 +39,8 @@ def test_rainfall():
         "district": "Baleshwar",
         "agency": "CGWB",
         "start_date": "2023-11-01",
-        "end_date": "2024-10-31"
+        "end_date": "2024-10-31",
+        "size": 2
     }
     response = requests.get(f"{BASE_URL}/api/v1/rainfall", params=params)
     print("Rainfall Endpoint:")
