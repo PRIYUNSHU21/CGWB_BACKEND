@@ -39,7 +39,7 @@ def calculate_recharge_rate(state: str, district: str, agency: str, start_date: 
     data_list = rainfall_data.get('data', [])
     if not isinstance(data_list, list):
         data_list = []
-    total_rainfall = sum(item.get('rainfall', 0) for item in data_list)
+    total_rainfall = sum(item.get('dataValue', 0) for item in data_list)
     factor = get_infiltration_factor(state)
     return total_rainfall * factor
 
