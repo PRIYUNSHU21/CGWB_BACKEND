@@ -8,7 +8,9 @@ def fetch_groundwater_data(state: str, district: str, agency: str, start_date: s
     
     df = pd.read_csv('groundwater_data.csv')
     # Filter by state, district, agency
-    filtered = df[(df['state'] == state) & (df['district'] == district) & (df['agency'] == agency)]
+    filtered = df[(df['state'] == state) & (df['district'] == district)]
+    if 'agency' in df.columns:
+        filtered = filtered[filtered['agency'] == agency]
     # Since data is yearly, filter by year range if possible
     if 'year' in filtered.columns:
         start_year = int(start_date[:4])
@@ -48,7 +50,9 @@ def fetch_rainfall_data(state: str, district: str, agency: str, start_date: str,
     
     df = pd.read_csv('rainfall_data.csv')
     # Filter by state, district, agency
-    filtered = df[(df['state'] == state) & (df['district'] == district) & (df['agency'] == agency)]
+    filtered = df[(df['state'] == state) & (df['district'] == district)]
+    if 'agency' in df.columns:
+        filtered = filtered[filtered['agency'] == agency]
     # Filter by year
     if 'year' in filtered.columns:
         start_year = int(start_date[:4])
