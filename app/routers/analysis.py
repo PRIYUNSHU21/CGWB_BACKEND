@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-import requests
 from app.services.analysis_service import analyze_groundwater, predict_trends
 
 router = APIRouter()

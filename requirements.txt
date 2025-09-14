@@ -3,3 +3,5 @@ uvicorn[standard]
 requests
 numpy
 scikit-learn
+pandas
+scipy

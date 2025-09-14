@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from app.services.wris_api_client import fetch_groundwater_data, fetch_rainfall_data
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from scipy.spatial.distance import cdist
+from district_coords import DISTRICT_COORDS
 
 # Soil-based infiltration coefficients (from soil_coefficients.md)
 SOIL_COEFFICIENT_MAP = {
@@ -34,6 +36,42 @@ LOW_THRESHOLD = 10.0
 def get_infiltration_factor(state: str) -> float:
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2) -> float:
+    """
+    Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
+    """
+    if district not in DISTRICT_COORDS:
+        return 0.0  # No coordinates, can't estimate
+    
+    target_coord = np.array(DISTRICT_COORDS[district])
+    known_values = []
+    distances = []
+    
+    # Get data for all districts in the same year
+    for d, coord in DISTRICT_COORDS.items():
+        if d == district:
+            continue
+        gw_data = fetch_groundwater_data(state, d, "CGWB", f"{year}-01-01", f"{year}-12-31")
+        data_list = gw_data.get('data', [])
+        if data_list:
+            level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
+            if level > 0:
+                known_values.append(level)
+                distances.append(np.array(coord))
+    
+    if not known_values:
+        return 0.0  # No known data
+    
+    distances = np.array(distances)
+    dists = cdist([target_coord], distances)[0]
+    
+    # IDW calculation
+    weights = 1 / (dists ** power)
+    weights /= np.sum(weights)
+    estimate = np.sum(np.array(known_values) * weights)
+    
+    return estimate
+
 def calculate_recharge_rate(state: str, district: str, agency: str, start_date: str, end_date: str) -> float:
     rainfall_data = fetch_rainfall_data(state, district, agency, start_date, end_date)
     data_list = rainfall_data.get('data', [])
@@ -44,9 +82,11 @@ def calculate_recharge_rate(state: str, district: str, agency: str, start_date: 
     return total_rainfall * factor
 
 def calculate_depletion_rate(state: str, district: str, agency: str, current_date: str, period_months: int = 12) -> float:
-    current_data = fetch_groundwater_data(state, district, agency, current_date, current_date)
-    past_date = (datetime.fromisoformat(current_date) - timedelta(days=period_months * 30)).isoformat()[:10]
-    past_data = fetch_groundwater_data(state, district, agency, past_date, past_date)
+    current_year = int(current_date[:4])
+    past_year = current_year - (period_months // 12)
+    
+    current_data = fetch_groundwater_data(state, district, agency, f"{current_year}-01-01", f"{current_year}-12-31")
+    past_data = fetch_groundwater_data(state, district, agency, f"{past_year}-01-01", f"{past_year}-12-31")
     
     current_list = current_data.get('data', [])
     if not isinstance(current_list, list):
@@ -58,8 +98,9 @@ def calculate_depletion_rate(state: str, district: str, agency: str, current_dat
     if not current_list or not past_list:
         return 0.0
     
-    current_level = current_list[0].get('dataValue', 0)
-    past_level = past_list[0].get('dataValue', 0)
+    # Average levels for the year
+    current_level = sum(item.get('dataValue', 0) for item in current_list) / len(current_list) if current_list else 0
+    past_level = sum(item.get('dataValue', 0) for item in past_list) / len(past_list) if past_list else 0
     time_years = period_months / 12
     depletion = (past_level - current_level) / time_years if time_years > 0 else 0
     return max(depletion, 0)
@@ -94,6 +135,23 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
     if not current_date:
         current_date = end_date
     gw_data = fetch_groundwater_data(state, district, agency, start_date, end_date)
+    
+    # If no data, estimate using IDW
+    data_list = gw_data.get('data', [])
+    if not data_list:
+        year = int(start_date[:4])
+        estimated_level = estimate_missing_groundwater_idw(state, district, year)
+        if estimated_level > 0:
+            gw_data = {
+                "data": [{
+                    "dataValue": estimated_level,
+                    "dataTime": f"{year}-06-01T00:00:00",
+                    "unit": "m",
+                    "estimated": True
+                }]
+            }
+            data_list = gw_data["data"]
+    
     recharge = calculate_recharge_rate(state, district, agency, start_date, end_date)
     analyzed_data = check_critical_levels(gw_data)
     for item in analyzed_data:
@@ -106,46 +164,50 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
     }
 
 def predict_trends(state: str, district: str, agency: str, historical_months: int = 24, forecast_months: int = 12) -> Dict[str, Any]:
-    """Predict groundwater level trends using linear regression."""
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=historical_months * 30)
+    """Predict groundwater level trends using linear regression on yearly data."""
+    historical_years = historical_months // 12
+    current_year = datetime.now().year
+    start_year = current_year - historical_years
     
-    # Fetch historical data (simplified: assume monthly data points)
-    dates = []
+    # Fetch yearly data
+    years = []
     levels = []
-    current = start_date
-    while current <= end_date:
-        data = fetch_groundwater_data(state, district, agency, current.isoformat(), current.isoformat())
+    for year in range(start_year, current_year + 1):
+        data = fetch_groundwater_data(state, district, agency, f"{year}-01-01", f"{year}-12-31")
         data_list = data.get('data', [])
         if not isinstance(data_list, list):
             data_list = []
         if data_list:
-            level = data_list[0].get('dataValue', 0)
-            dates.append((current - start_date).days)  # Days since start
+            level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
+        else:
+            # Estimate if missing
+            level = estimate_missing_groundwater_idw(state, district, year)
+        if level > 0:
+            years.append(year)
             levels.append(level)
-        current += timedelta(days=30)  # Monthly
     
-    if len(dates) < 2:
+    if len(years) < 2:
         return {"error": "Insufficient historical data for trend analysis"}
     
     # Fit linear regression
-    X = np.array(dates).reshape(-1, 1)
+    X = np.array(years).reshape(-1, 1)
     y = np.array(levels)
     model = LinearRegression()
     model.fit(X, y)
     
-    slope = model.coef_[0]  # Change per day
+    slope = model.coef_[0]  # Change per year
     trend = "Declining" if slope < 0 else "Recovering" if slope > 0 else "Stable"
     
-    # Forecast future levels
-    future_dates = np.array([max(dates) + i * 30 for i in range(1, forecast_months + 1)]).reshape(-1, 1)
-    predictions = model.predict(future_dates)
+    # Forecast future years
+    forecast_years = [current_year + i for i in range(1, (forecast_months // 12) + 1)]
+    future_X = np.array(forecast_years).reshape(-1, 1)
+    predictions = model.predict(future_X)
     
     return {
-        "trend_slope": slope * 30,  # Per month
+        "trend_slope": slope,
         "trend_status": trend,
         "historical_levels": levels,
         "predicted_levels": predictions.tolist(),
-        "forecast_period_months": forecast_months,
-        "unit": "m/month"
+        "forecast_period_years": len(forecast_years),
+        "unit": "m/year"
     }

@@ -1,7 +1,7 @@
 import requests
 
 # Base URL for the deployed API
-BASE_URL = "https://cgwbbackend-production.up.railway.app"
+BASE_URL = "http://127.0.0.1:8000"
 
 def test_root():
     """Test the root endpoint."""
@@ -19,7 +19,7 @@ def test_groundwater():
         "agency": "CGWB",
         "start_date": "2023-11-01",
         "end_date": "2024-10-31",
-        "size": 2
+        "size": 1
     }
     response = requests.get(f"{BASE_URL}/api/v1/groundwater", params=params)
     print("Groundwater Endpoint:")
@@ -37,10 +37,10 @@ def test_rainfall():
     params = {
         "state": "Odisha",
         "district": "Baleshwar",
-        "agency": "CGWB",
-        "start_date": "2023-11-01",
-        "end_date": "2024-10-31",
-        "size": 2
+        "agency": "CWC",
+        "start_date": "2024-12-01",
+        "end_date": "2024-12-05",
+        "size": 1
     }
     response = requests.get(f"{BASE_URL}/api/v1/rainfall", params=params)
     print("Rainfall Endpoint:")
@@ -84,8 +84,8 @@ def test_trends():
         "state": "Odisha",
         "district": "Baleshwar",
         "agency": "CGWB",
-        "start_date": "2023-11-01",
-        "end_date": "2024-10-31"
+        "historical_months": 24,
+        "forecast_months": 12
     }
     response = requests.get(f"{BASE_URL}/api/v1/groundwater-trends", params=params)
     print("Groundwater Trends Endpoint:")

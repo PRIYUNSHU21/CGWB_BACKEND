@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-import requests
 from app.services.wris_api_client import fetch_rainfall_data
 
 router = APIRouter()
@@ -19,5 +18,5 @@ async def get_rainfall_data(
         return data
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Data error: {str(e)}")
-    except requests.RequestException as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
