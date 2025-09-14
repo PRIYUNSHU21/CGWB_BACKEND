@@ -16,12 +16,12 @@ def fetch_groundwater_data(state: str, district: str, agency: str, start_date: s
         "size": size
     }
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
-        response = requests.get(url, params=params, headers=headers, timeout=30)
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", "accept": "application/json"}
+        response = requests.post(url, params=params, headers=headers, timeout=30)
         response.raise_for_status()
         data = response.json()
         status_code = data.get("statusCode")
-        if status_code is not None and str(status_code) != "0":
+        if status_code is not None and status_code != 200:
             raise ValueError(f"API Error: {data.get('message', 'Unknown error')}")
         return data
     except requests.RequestException as e:
@@ -42,12 +42,12 @@ def fetch_rainfall_data(state: str, district: str, agency: str, start_date: str,
         "size": size
     }
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
-        response = requests.get(url, params=params, headers=headers, timeout=30)
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", "accept": "application/json"}
+        response = requests.post(url, params=params, headers=headers, timeout=30)
         response.raise_for_status()
         data = response.json()
         status_code = data.get("statusCode")
-        if status_code is not None and str(status_code) != "0":
+        if status_code is not None and status_code != 200:
             raise ValueError(f"API Error: {data.get('message', 'Unknown error')}")
         return data
     except requests.RequestException as e:
