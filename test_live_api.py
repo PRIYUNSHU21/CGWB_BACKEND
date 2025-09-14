@@ -56,7 +56,7 @@ def test_rainfall_data():
     params = {
         "state": "West Bengal",
         "district": "Kolkata",
-        "agency": "CWC",  # Rainfall data uses CWC agency
+        "agency": "CGWB",  # Updated to match CSV
         "start_date": "2024-01-01",
         "end_date": "2024-12-31"
     }
