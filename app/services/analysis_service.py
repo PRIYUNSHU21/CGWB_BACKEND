@@ -30,10 +30,43 @@ SOIL_COEFFICIENT_MAP = {
     "default": 0.3  # National average
 }
 
+# District-specific infiltration factors for West Bengal (based on soil types)
+DISTRICT_INFILTRATION = {
+    # Gangetic Plains - Alluvial soils (high infiltration)
+    "Kolkata": 0.40,
+    "Nadia": 0.38,
+    "Murshidabad": 0.38,
+    "Hooghly": 0.37,
+    "Howrah": 0.36,
+    "North 24 Parganas": 0.38,
+    "South 24 Parganas": 0.37,
+    
+    # Hilly/Mountainous - Forest/Mountain soils (low infiltration)
+    "Darjeeling": 0.25,
+    "Jalpaiguri": 0.28,
+    "Alipurduar": 0.27,
+    
+    # Red Laterite/Red soils (medium infiltration)
+    "Birbhum": 0.32,
+    "Bankura": 0.33,
+    "Jhargram": 0.31,
+    "Purulia": 0.30,
+    
+    # Coastal/Saline (variable)
+    "Medinipur": 0.34,
+    "Purba Medinipur": 0.34,
+    "Paschim Medinipur": 0.33,
+    
+    # Default for West Bengal districts not listed
+    "default_wb": 0.35
+}
+
 CRITICAL_THRESHOLD = 5.0  # m below ground
 LOW_THRESHOLD = 10.0
 
-def get_infiltration_factor(state: str) -> float:
+def get_infiltration_factor(state: str, district: str = None) -> float:
+    if state == "West Bengal" and district:
+        return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
 def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 5.0) -> float:
@@ -80,7 +113,7 @@ def calculate_recharge_rate(state: str, district: str, agency: str, start_date: 
     if not isinstance(data_list, list):
         data_list = []
     total_rainfall = sum(item.get('dataValue', 0) for item in data_list)
-    factor = get_infiltration_factor(state)
+    factor = get_infiltration_factor(state, district)
     return total_rainfall * factor
 
 def calculate_depletion_rate(state: str, district: str, agency: str, current_date: str, period_months: int = 12) -> float:
