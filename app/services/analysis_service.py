@@ -36,9 +36,10 @@ LOW_THRESHOLD = 10.0
 def get_infiltration_factor(state: str) -> float:
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2) -> float:
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 5.0) -> float:
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
+    max_distance in degrees (approx 5° ~ 500km at equator).
     """
     if district not in DISTRICT_COORDS:
         return 0.0  # No coordinates, can't estimate
@@ -56,17 +57,18 @@ def estimate_missing_groundwater_idw(state: str, district: str, year: int, power
         if data_list:
             level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
             if level > 0:
-                known_values.append(level)
-                distances.append(np.array(coord))
+                dist = np.linalg.norm(np.array(coord) - target_coord)  # Euclidean distance in degrees
+                if dist <= max_distance:
+                    known_values.append(level)
+                    distances.append(dist)
     
     if not known_values:
-        return 0.0  # No known data
+        return 0.0  # No known data within range
     
     distances = np.array(distances)
-    dists = cdist([target_coord], distances)[0]
     
     # IDW calculation
-    weights = 1 / (dists ** power)
+    weights = 1 / (distances ** power)
     weights /= np.sum(weights)
     estimate = np.sum(np.array(known_values) * weights)
     
@@ -159,8 +161,8 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
     depletion = calculate_depletion_rate(state, district, agency, current_date, period_months)
     return {
         "groundwater_data": analyzed_data,
-        "recharge_rate": recharge if not np.isnan(recharge) else 0.0,
-        "depletion_rate": depletion if not np.isnan(depletion) else 0.0,
+        "recharge_rate": round(recharge if not np.isnan(recharge) else 0.0, 4),
+        "depletion_rate": round(depletion if not np.isnan(depletion) else 0.0, 4),
         "unit": "m/year"
     }
 
@@ -217,10 +219,10 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     predictions = model.predict(future_X)
     
     return {
-        "trend_slope": slope,
+        "trend_slope": round(slope, 4),
         "trend_status": trend,
-        "historical_levels": levels,
-        "predicted_levels": predictions.tolist(),
+        "historical_levels": [round(l, 4) for l in levels],
+        "predicted_levels": [round(p, 4) for p in predictions.tolist()],
         "forecast_period_years": len(forecast_years),
         "unit": "m/year"
     }
