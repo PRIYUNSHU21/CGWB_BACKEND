@@ -180,12 +180,14 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
             data_list = []
         if data_list:
             level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
+            years.append(year)
+            levels.append(level)
         else:
             # Estimate if missing
             level = estimate_missing_groundwater_idw(state, district, year)
-        if level > 0:
-            years.append(year)
-            levels.append(level)
+            if level != 0.0:  # Only use estimate if not zero
+                years.append(year)
+                levels.append(level)
     
     if len(years) < 2:
         return {"error": "Insufficient historical data for trend analysis"}
