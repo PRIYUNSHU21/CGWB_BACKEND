@@ -180,14 +180,24 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
             data_list = []
         if data_list:
             level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
-            years.append(year)
-            levels.append(level)
         else:
             # Estimate if missing
             level = estimate_missing_groundwater_idw(state, district, year)
-            if level != 0.0:  # Only use estimate if not zero
-                years.append(year)
-                levels.append(level)
+            if level == 0.0:
+                level = None  # Mark as missing for interpolation
+        years.append(year)
+        levels.append(level)
+    
+    # Interpolate missing values
+    valid_years = [y for y, l in zip(years, levels) if l is not None]
+    valid_levels = [l for l in levels if l is not None]
+    if len(valid_years) >= 2:
+        interpolated_levels = np.interp(years, valid_years, valid_levels)
+        levels = interpolated_levels.tolist()
+    else:
+        # If not enough valid points, use only valid ones
+        years = valid_years
+        levels = valid_levels
     
     if len(years) < 2:
         return {"error": "Insufficient historical data for trend analysis"}
