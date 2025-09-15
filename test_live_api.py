@@ -26,7 +26,7 @@ def test_trends():
         "state": "West Bengal",
         "district": "Bankura",
         "agency": "CGWB",
-        "historical_months": 24,
+        "historical_months": 120,  # 10 years
         "forecast_months": 12
     }
     response = requests.get(f"{BASE_URL}/groundwater-trends", params=params)

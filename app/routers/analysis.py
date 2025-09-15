@@ -26,7 +26,7 @@ async def get_groundwater_trends(
     state: str,
     district: str,
     agency: str,
-    historical_months: int = 24,
+    historical_months: int = 120,  # Changed to 10 years (120 months)
     forecast_months: int = 12
 ):
     try:
