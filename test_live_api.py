@@ -9,13 +9,13 @@ def test_root():
 def test_groundwater_analysis():
     payload = {
         "state": "West Bengal",
-        "district": "Kolkata",  # Changed to Kolkata for testing missing data
+        "district": "Darjeeling",  # District with no groundwater data to test IDW
         "agency": "CGWB",
         "start_date": "2023-01-01",
         "end_date": "2024-12-31"
     }
     response = requests.get(f"{BASE_URL}/groundwater-analysis", params=payload)
-    print(f"Groundwater Analysis (Kolkata): {response.status_code}")
+    print(f"Groundwater Analysis (Darjeeling): {response.status_code}")
     if response.status_code == 200:
         print(response.json())
     else:
@@ -30,7 +30,7 @@ def test_trends():
         "forecast_months": 12
     }
     response = requests.get(f"{BASE_URL}/groundwater-trends", params=params)
-    print(f"Trends (Kolkata): {response.status_code}")
+    print(f"Trends (Darjeeling): {response.status_code}")
     if response.status_code == 200:
         print(response.json())
     else:
@@ -39,13 +39,13 @@ def test_trends():
 def test_groundwater_data():
     params = {
         "state": "West Bengal",
-        "district": "Kolkata",  # District with limited data to test IDW/interpolation
+        "district": "Darjeeling",  # District with no groundwater data to test IDW
         "agency": "CGWB",
         "start_date": "2023-01-01",
         "end_date": "2024-12-31"
     }
     response = requests.get(f"{BASE_URL}/groundwater", params=params)
-    print(f"Groundwater Data (Kolkata): {response.status_code}")
+    print(f"Groundwater Data (Darjeeling): {response.status_code}")
     if response.status_code == 200:
         data = response.json()
         print(f"Data points: {len(data.get('data', []))}")
@@ -55,7 +55,7 @@ def test_groundwater_data():
 def test_rainfall_data():
     params = {
         "state": "West Bengal",
-        "district": "Kolkata",
+        "district": "Darjeeling",
         "agency": "CGWB",  # Updated to match CSV
         "start_date": "2024-01-01",
         "end_date": "2024-12-31"
