@@ -138,8 +138,14 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
         current_date = end_date
     gw_data = fetch_groundwater_data(state, district, agency, start_date, end_date)
     
-    # If no data, estimate using IDW
+    # Filter to latest data point
     data_list = gw_data.get('data', [])
+    if data_list:
+        data_list.sort(key=lambda x: x.get('dataTime', ''), reverse=True)
+        gw_data['data'] = [data_list[0]]
+        data_list = gw_data["data"]
+    
+    # If no data, estimate using IDW
     if not data_list:
         year = int(start_date[:4])
         estimated_level = estimate_missing_groundwater_idw(state, district, year)
