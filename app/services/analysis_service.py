@@ -179,6 +179,7 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
         data_list = gw_data["data"]
     
     # If no data, estimate using IDW
+    has_estimated = False
     if not data_list:
         year = int(start_date[:4])
         estimated_level = estimate_missing_groundwater_idw(state, district, year)
@@ -188,10 +189,18 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
                     "dataValue": estimated_level,
                     "dataTime": f"{year}-06-01T00:00:00",
                     "unit": "m",
-                    "estimated": True
+                    "is_estimated": True,
+                    "estimation_method": "IDW"
                 }]
             }
             data_list = gw_data["data"]
+            has_estimated = True
+    else:
+        # Check if any existing data is estimated (though currently not)
+        for item in data_list:
+            if item.get("is_estimated"):
+                has_estimated = True
+                break
     
     recharge = calculate_recharge_rate(state, district, agency, start_date, end_date)
     analyzed_data = check_critical_levels(gw_data)
@@ -202,6 +211,7 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
         "groundwater_data": analyzed_data,
         "recharge_rate": round(recharge if not np.isnan(recharge) else 0.0, 4),
         "depletion_rate": round(depletion if not np.isnan(depletion) else 0.0, 4),
+        "has_estimated_data": has_estimated,
         "unit": "m/year"
     }
 
@@ -214,6 +224,7 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     # Fetch yearly data
     years = []
     levels = []
+    has_estimated_levels = False
     for year in range(start_year, current_year):
         data = fetch_groundwater_data(state, district, agency, f"{year}-01-01", f"{year}-12-31")
         data_list = data.get('data', [])
@@ -226,6 +237,8 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
             level = estimate_missing_groundwater_idw(state, district, year)
             if level == 0.0:
                 level = None  # Mark as missing for interpolation
+            else:
+                has_estimated_levels = True
         years.append(year)
         levels.append(level)
     
@@ -250,6 +263,7 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     model.fit(X, y)
     
     slope = model.coef_[0]  # Change per year
+    r_squared = model.score(X, y)
     trend = "Declining" if slope < 0 else "Recovering" if slope > 0 else "Stable"
     
     # Forecast future years
@@ -260,8 +274,10 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     return {
         "trend_slope": round(slope, 4),
         "trend_status": trend,
+        "r_squared": round(r_squared, 4),
         "historical_levels": [round(l, 4) for l in levels],
         "predicted_levels": [round(p, 4) for p in predictions.tolist()],
+        "has_estimated_levels": has_estimated_levels,
         "forecast_period_years": len(forecast_years),
         "unit": "m/year"
     }
