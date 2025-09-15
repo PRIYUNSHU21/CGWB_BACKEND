@@ -173,7 +173,7 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     # Fetch yearly data
     years = []
     levels = []
-    for year in range(start_year, current_year + 1):
+    for year in range(start_year, current_year):
         data = fetch_groundwater_data(state, district, agency, f"{year}-01-01", f"{year}-12-31")
         data_list = data.get('data', [])
         if not isinstance(data_list, list):
