@@ -2,7 +2,8 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 from app.services.wris_api_client import fetch_groundwater_data, fetch_rainfall_data
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.preprocessing import PolynomialFeatures
 from scipy.spatial.distance import cdist
 from district_coords import DISTRICT_COORDS
 
@@ -172,8 +173,8 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
         "unit": "m/year"
     }
 
-def predict_trends(state: str, district: str, agency: str, historical_months: int = 24, forecast_months: int = 12) -> Dict[str, Any]:
-    """Predict groundwater level trends using linear regression on yearly data."""
+def predict_trends(state: str, district: str, agency: str, historical_months: int = 120, forecast_months: int = 12) -> Dict[str, Any]:
+    """Predict groundwater level trends using regularized polynomial regression on yearly data."""
     historical_years = historical_months // 12
     current_year = datetime.now().year
     start_year = current_year - historical_years
@@ -210,23 +211,31 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
     if len(years) < 2:
         return {"error": "Insufficient historical data for trend analysis"}
     
-    # Fit linear regression
+    # Fit regularized polynomial regression (degree 2)
     X = np.array(years).reshape(-1, 1)
     y = np.array(levels)
-    model = LinearRegression()
-    model.fit(X, y)
+    poly = PolynomialFeatures(degree=2)
+    X_poly = poly.fit_transform(X)
+    model = Ridge(alpha=1.0)  # Regularization strength
+    model.fit(X_poly, y)
     
-    slope = model.coef_[0]  # Change per year
+    # Calculate R² for accuracy
+    r_squared = model.score(X_poly, y)
+    
+    # For slope, use the linear coefficient (approximate)
+    slope = model.coef_[1]  # Coefficient of x term
     trend = "Declining" if slope < 0 else "Recovering" if slope > 0 else "Stable"
     
     # Forecast future years
     forecast_years = [current_year + i for i in range(1, (forecast_months // 12) + 1)]
     future_X = np.array(forecast_years).reshape(-1, 1)
-    predictions = model.predict(future_X)
+    future_X_poly = poly.transform(future_X)
+    predictions = model.predict(future_X_poly)
     
     return {
         "trend_slope": round(slope, 4),
         "trend_status": trend,
+        "r_squared": round(r_squared, 4),
         "historical_levels": [round(l, 4) for l in levels],
         "predicted_levels": [round(p, 4) for p in predictions.tolist()],
         "forecast_period_years": len(forecast_years),
