@@ -69,42 +69,66 @@ def get_infiltration_factor(state: str, district: str = None) -> float:
         return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 5.0) -> float:
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 5.0, lookback_years: int = 3):
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
     max_distance in degrees (approx 5° ~ 500km at equator).
     """
     if district not in DISTRICT_COORDS:
-        return 0.0  # No coordinates, can't estimate
+        return None  # No coordinates, can't estimate
     
     target_coord = np.array(DISTRICT_COORDS[district])
     known_values = []
     distances = []
-    
-    # Get data for all districts in the same year
+
+    # For each other district, attempt to find the most recent data within lookback_years
     for d, coord in DISTRICT_COORDS.items():
         if d == district:
             continue
-        gw_data = fetch_groundwater_data(state, d, "CGWB", f"{year}-01-01", f"{year}-12-31")
-        data_list = gw_data.get('data', [])
-        if data_list:
-            level = sum(item.get('dataValue', 0) for item in data_list) / len(data_list)
-            if level > 0:
-                dist = np.linalg.norm(np.array(coord) - target_coord)  # Euclidean distance in degrees
-                if dist <= max_distance:
-                    known_values.append(level)
-                    distances.append(dist)
+
+        # Try same year first, then look back up to lookback_years
+        values_found = []
+        for y in range(year, year - lookback_years - 1, -1):
+            gw_data = fetch_groundwater_data(state, d, "CGWB", f"{y}-01-01", f"{y}-12-31")
+            data_list = gw_data.get('data', [])
+            if data_list:
+                # Collect numeric dataValues from the returned list
+                vals = [item.get('dataValue') for item in data_list if item.get('dataValue') is not None]
+                if vals:
+                    # Use average of available values for that district-year
+                    values_found.extend(vals)
+        if not values_found:
+            continue
+
+        # Average across the collected values (could be multiple years)
+        level = float(sum(values_found) / len(values_found))
+
+        # Compute Euclidean distance (degrees). If districts share coordinates, treat specially.
+        dist = np.linalg.norm(np.array(coord) - target_coord)
+
+        # Skip if outside max_distance
+        if dist > max_distance:
+            continue
+
+        # If distance is zero (same coordinates), return that district's level directly
+        if dist == 0:
+            return float(level)
+
+        known_values.append(level)
+        distances.append(dist)
     
     if not known_values:
-        return 0.0  # No known data within range
+        return None  # No known data within range
     
     distances = np.array(distances)
-    
-    # IDW calculation
-    weights = 1 / (distances ** power)
+
+    # IDW calculation (handle any tiny distances safely)
+    # Add a small epsilon to distances to avoid division by zero (but zero handled above)
+    eps = 1e-8
+    weights = 1.0 / ((distances + eps) ** power)
     weights /= np.sum(weights)
-    estimate = np.sum(np.array(known_values) * weights)
-    
+    estimate = float(np.sum(np.array(known_values) * weights))
+
     return estimate
 
 def calculate_recharge_rate(state: str, district: str, agency: str, start_date: str, end_date: str) -> float:
