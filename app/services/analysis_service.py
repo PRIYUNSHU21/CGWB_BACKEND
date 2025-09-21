@@ -69,7 +69,7 @@ def get_infiltration_factor(state: str, district: str = None) -> float:
         return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 5.0, lookback_years: int = 3):
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 8.0):
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
     max_distance in degrees (approx 5° ~ 500km at equator).
@@ -81,39 +81,25 @@ def estimate_missing_groundwater_idw(state: str, district: str, year: int, power
     known_values = []
     distances = []
 
-    # For each other district, attempt to find the most recent data within lookback_years
+    # For each other district, attempt to find same-year data only (expand radius instead of using past years)
     for d, coord in DISTRICT_COORDS.items():
         if d == district:
             continue
-
-        # Try same year first, then look back up to lookback_years
-        values_found = []
-        for y in range(year, year - lookback_years - 1, -1):
-            gw_data = fetch_groundwater_data(state, d, "CGWB", f"{y}-01-01", f"{y}-12-31")
-            data_list = gw_data.get('data', [])
-            if data_list:
-                # Collect numeric dataValues from the returned list
-                vals = [item.get('dataValue') for item in data_list if item.get('dataValue') is not None]
-                if vals:
-                    # Use average of available values for that district-year
-                    values_found.extend(vals)
-        if not values_found:
+        gw_data = fetch_groundwater_data(state, d, "CGWB", f"{year}-01-01", f"{year}-12-31")
+        data_list = gw_data.get('data', [])
+        if not data_list:
             continue
 
-        # Average across the collected values (could be multiple years)
-        level = float(sum(values_found) / len(values_found))
+        vals = [item.get('dataValue') for item in data_list if item.get('dataValue') is not None]
+        if not vals:
+            continue
 
-        # Compute Euclidean distance (degrees). If districts share coordinates, treat specially.
+        level = float(sum(vals) / len(vals))
         dist = np.linalg.norm(np.array(coord) - target_coord)
-
-        # Skip if outside max_distance
         if dist > max_distance:
             continue
-
-        # If distance is zero (same coordinates), return that district's level directly
         if dist == 0:
             return float(level)
-
         known_values.append(level)
         distances.append(dist)
     
