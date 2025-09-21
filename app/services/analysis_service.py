@@ -69,19 +69,19 @@ def get_infiltration_factor(state: str, district: str = None) -> float:
         return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 800.0):
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance_km: float = 800.0):
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
-    max_distance in kilometers (using haversine distance).
+    max_distance_km is in kilometers using haversine distance.
     """
     if district not in DISTRICT_COORDS:
         return None  # No coordinates, can't estimate
-    
+
     target_coord = np.array(DISTRICT_COORDS[district])
     known_values = []
     distances = []
 
-    # For each other district, attempt to find same-year data only (expand radius instead of using past years)
+    # For each other district, attempt to find same-year data only
     for d, coord in DISTRICT_COORDS.items():
         if d == district:
             continue
@@ -95,21 +95,20 @@ def estimate_missing_groundwater_idw(state: str, district: str, year: int, power
             continue
 
         level = float(sum(vals) / len(vals))
-        dist = haversine_distance(target_coord, coord)  # Use haversine for geographic distance in km
-        if dist > max_distance:
+        dist_km = haversine_distance(target_coord, coord)
+        if dist_km > max_distance_km:
             continue
-        if dist == 0:
+        if dist_km == 0:
             return float(level)
         known_values.append(level)
-        distances.append(dist)
-    
+        distances.append(dist_km)
+
     if not known_values:
         return None  # No known data within range
-    
+
     distances = np.array(distances)
 
     # IDW calculation (handle any tiny distances safely)
-    # Add a small epsilon to distances to avoid division by zero (but zero handled above)
     eps = 1e-8
     weights = 1.0 / ((distances + eps) ** power)
     weights /= np.sum(weights)
@@ -181,19 +180,21 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
         current_date = end_date
     gw_data = fetch_groundwater_data(state, district, agency, start_date, end_date)
     
-    # Filter to latest data point
+    # Filter to latest data point, but consider only numeric dataValue as real observation
     data_list = gw_data.get('data', [])
-    if data_list:
-        data_list.sort(key=lambda x: x.get('dataTime', ''), reverse=True)
-        gw_data['data'] = [data_list[0]]
-        data_list = gw_data["data"]
-    
-    # If no data, estimate using IDW
+    numeric_obs = [item for item in data_list if item.get('dataValue') is not None]
     has_estimated = False
-    if not data_list:
+
+    if numeric_obs:
+        # Sort by dataTime descending and take the latest numeric record
+        numeric_obs.sort(key=lambda x: x.get('dataTime', ''), reverse=True)
+        gw_data['data'] = [numeric_obs[0]]
+        data_list = gw_data['data']
+    else:
+        # No numeric observations in the period: estimate using IDW
         year = int(start_date[:4])
         estimated_level = estimate_missing_groundwater_idw(state, district, year)
-        if estimated_level > 0:
+        if estimated_level is not None:
             gw_data = {
                 "data": [{
                     "dataValue": estimated_level,
@@ -205,12 +206,9 @@ def analyze_groundwater(state: str, district: str, agency: str, start_date: str,
             }
             data_list = gw_data["data"]
             has_estimated = True
-    else:
-        # Check if any existing data is estimated (though currently not)
-        for item in data_list:
-            if item.get("is_estimated"):
-                has_estimated = True
-                break
+        else:
+            gw_data = {"data": []}
+            data_list = []
     
     recharge = calculate_recharge_rate(state, district, agency, start_date, end_date)
     analyzed_data = check_critical_levels(gw_data)

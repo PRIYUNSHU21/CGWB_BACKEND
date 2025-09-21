@@ -18,15 +18,20 @@ async def get_groundwater_data(
         data = fetch_groundwater_data(state, district, agency, start_date, end_date, page, size)
         data_list = data.get('data', [])
         has_estimated = False
-        if data_list:
-            # Sort by dataTime descending and take the latest
-            data_list.sort(key=lambda x: x.get('dataTime', ''), reverse=True)
-            data['data'] = [data_list[0]]
+
+        # Consider only numeric dataValue as valid real observations
+        numeric_values = [item for item in data_list if item.get('dataValue') is not None]
+
+        if numeric_values:
+            # Sort by dataTime descending and take the latest numeric record
+            numeric_values.sort(key=lambda x: x.get('dataTime', ''), reverse=True)
+            data['data'] = [numeric_values[0]]
+            data['has_estimated_data'] = False
         else:
-            # No real data, provide IDW estimate
+            # No numeric observations: try IDW estimation for the requested year
             year = int(start_date[:4])
             estimated_level = estimate_missing_groundwater_idw(state, district, year)
-            if estimated_level > 0:
+            if estimated_level is not None:
                 data = {
                     "data": [{
                         "dataValue": estimated_level,
@@ -47,12 +52,7 @@ async def get_groundwater_data(
                 }
                 has_estimated = True
             else:
-                data['has_estimated_data'] = False
-        
-        if not has_estimated and data_list:
-            data['has_estimated_data'] = False
-        elif has_estimated:
-            data['has_estimated_data'] = True
+                data = {"data": [], "has_estimated_data": False}
             
         return data
     except ValueError as e:
