@@ -69,10 +69,10 @@ def get_infiltration_factor(state: str, district: str = None) -> float:
         return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 8.0):
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 800.0):
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
-    max_distance in degrees (approx 5° ~ 500km at equator).
+    max_distance in kilometers (using haversine distance).
     """
     if district not in DISTRICT_COORDS:
         return None  # No coordinates, can't estimate
@@ -95,7 +95,7 @@ def estimate_missing_groundwater_idw(state: str, district: str, year: int, power
             continue
 
         level = float(sum(vals) / len(vals))
-        dist = np.linalg.norm(np.array(coord) - target_coord)
+        dist = haversine_distance(target_coord, coord)  # Use haversine for geographic distance in km
         if dist > max_distance:
             continue
         if dist == 0:
@@ -291,3 +291,23 @@ def predict_trends(state: str, district: str, agency: str, historical_months: in
         "forecast_period_years": len(forecast_years),
         "unit": "m/year"
     }
+
+# Add haversine distance function for geographic accuracy
+def haversine_distance(coord1, coord2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1 = np.radians(coord1)
+    lat2, lon2 = np.radians(coord2)
+    
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    
+    # Radius of earth in kilometers. Use 6371 for km
+    r = 6371
+    return c * r
