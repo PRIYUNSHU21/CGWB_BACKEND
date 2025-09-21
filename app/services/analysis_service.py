@@ -2,9 +2,23 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 from app.services.wris_api_client import fetch_groundwater_data, fetch_rainfall_data
 import numpy as np
+import math
 from sklearn.linear_model import LinearRegression
 from scipy.spatial.distance import cdist
 from district_coords import DISTRICT_COORDS
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate the great circle distance between two points on the earth (specified in decimal degrees)"""
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    r = 6371  # Radius of earth in kilometers
+    return c * r
 
 # Soil-based infiltration coefficients (from soil_coefficients.md)
 SOIL_COEFFICIENT_MAP = {
@@ -69,7 +83,7 @@ def get_infiltration_factor(state: str, district: str = None) -> float:
         return DISTRICT_INFILTRATION.get(district, DISTRICT_INFILTRATION.get("default_wb", 0.35))
     return SOIL_COEFFICIENT_MAP.get(state, SOIL_COEFFICIENT_MAP["default"])
 
-def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 8.0):
+def estimate_missing_groundwater_idw(state: str, district: str, year: int, power: int = 2, max_distance: float = 10.0):
     """
     Estimate groundwater level for a missing district using Inverse Distance Weighting (IDW).
     max_distance in degrees (approx 5° ~ 500km at equator).
@@ -95,7 +109,8 @@ def estimate_missing_groundwater_idw(state: str, district: str, year: int, power
             continue
 
         level = float(sum(vals) / len(vals))
-        dist = np.linalg.norm(np.array(coord) - target_coord)
+        # Use haversine distance in km
+        dist = haversine_distance(target_coord[0], target_coord[1], coord[0], coord[1])
         if dist > max_distance:
             continue
         if dist == 0:
